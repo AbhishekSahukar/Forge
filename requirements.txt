@@ -1,0 +1,24 @@
+fastapi==0.141.1
+uvicorn[standard]==0.52.4
+pydantic==2.13.5
+pydantic-settings==2.15.0
+python-dotenv==1.2.2
+
+# Pinned to the 1.x line deliberately — mcp 2.0 renamed FastMCP to
+# MCPServer and changed several APIs. 1.x is what most current MCP
+# tutorials/servers (incl. github-mcp-server client examples) target.
+mcp==1.16.0
+
+langgraph==1.2.11
+langchain-core==1.6.2
+langchain-openai==1.6.0
+
+# A2A protocol — pinned to the 0.2.x line deliberately. 1.x switched
+# AgentCard/AgentSkill etc. to protobuf-backed types with a materially
+# different, less-documented construction API; 0.2.x is pydantic-based
+# and matches the SDK's own quickstart examples.
+a2a-sdk==0.2.16
+
+# Auth (Phase 6)
+pyjwt==2.11.0
+bcrypt==5.0.0

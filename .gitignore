@@ -1,0 +1,33 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# Environment / secrets — never commit real credentials
+.env
+
+# SQLite data (proposals store) — local runtime data, not source
+forge_data.db
+forge_data.db-wal
+forge_data.db-shm
+
+# Frontend (redundant with frontend/.gitignore, but safe to have here too)
+frontend/node_modules/
+frontend/dist/
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Old dev artifacts from this conversation, if still present
+repo_part1.txt
+repo_part2.txt
+repo_part3.txt
+repo_part4.txt
+repo_tree.txt
+
+README.md 
