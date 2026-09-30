@@ -1,12 +1,10 @@
 # Forge — single combined image: builds the React frontend, then runs all 4
 # backend processes (main-api + 3 agent servers) in one container, with
-# main-api serving the built frontend directly. One Render service, one
-# port, no CORS between frontend and backend since they're now the same
-# origin.
+# main-api serving the built frontend directly.
 #
-# Build context must be the REPO ROOT (the folder containing both
-# backend/ and frontend/), not backend/ alone — this Dockerfile copies
-# from both.
+# Matches the REAL repo layout: app/, requirements.txt, run_all.py sit
+# directly at the repo root (no backend/ wrapper folder) — only
+# frontend/ is its own subfolder. Build context must be the repo root.
 
 # ---- Stage 1: build the React frontend ----
 FROM node:20-slim AS frontend-build
@@ -33,11 +31,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-COPY backend/requirements.txt .
+COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY backend/app/ ./app/
-COPY backend/run_all.py .
+COPY app/ ./app/
+COPY run_all.py .
 
 # The built frontend lands at /app/static — main.py's StaticFiles mount
 # and root route both expect it exactly here.
