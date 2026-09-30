@@ -51,15 +51,16 @@ function LoginScreen({ onLogin }) {
   );
 }
 
-function RequestPanel() {
-  const [requestText, setRequestText] = useState("");
+function useStreamedAction() {
+  // Shared streaming-run state so the picker's Investigate/Fix buttons
+  // reuse exactly the same SSE-consuming logic the old free-text form used —
+  // only how the request text gets built changes, not how it's executed.
   const [loading, setLoading] = useState(false);
   const [events, setEvents] = useState([]);
   const [finalReport, setFinalReport] = useState(null);
   const [error, setError] = useState("");
 
-  async function handleSubmit(e) {
-    e.preventDefault();
+  async function run(requestText) {
     setError("");
     setEvents([]);
     setFinalReport(null);
@@ -71,7 +72,6 @@ function RequestPanel() {
         } else if (event.state === "failed") {
           setError(event.text);
         } else {
-          // routing / working status — append to the live activity feed
           setEvents((prev) => [...prev, event.text].filter(Boolean));
         }
       });
@@ -82,41 +82,228 @@ function RequestPanel() {
     }
   }
 
+  return { loading, events, finalReport, error, run };
+}
+
+function IssuePickerPanel() {
+  const [step, setStep] = useState("account"); // account | repo | issue | action
+
+  const [accountQuery, setAccountQuery] = useState("");
+  const [accounts, setAccounts] = useState([]);
+  const [searching, setSearching] = useState(false);
+  const [selectedAccount, setSelectedAccount] = useState(null);
+
+  const [repos, setRepos] = useState([]);
+  const [loadingRepos, setLoadingRepos] = useState(false);
+  const [selectedRepo, setSelectedRepo] = useState(null);
+
+  const [issues, setIssues] = useState([]);
+  const [loadingIssues, setLoadingIssues] = useState(false);
+  const [selectedIssue, setSelectedIssue] = useState(null);
+
+  const [listError, setListError] = useState("");
+  const action = useStreamedAction();
+
+  async function handleSearchAccounts(e) {
+    e.preventDefault();
+    setListError("");
+    setSearching(true);
+    try {
+      setAccounts(await api.searchGithubAccounts(accountQuery));
+    } catch (err) {
+      setListError(err.message);
+    } finally {
+      setSearching(false);
+    }
+  }
+
+  async function selectAccount(acct) {
+    setSelectedAccount(acct);
+    setStep("repo");
+    setListError("");
+    setLoadingRepos(true);
+    try {
+      setRepos(await api.listGithubRepos(acct.login));
+    } catch (err) {
+      setListError(err.message);
+    } finally {
+      setLoadingRepos(false);
+    }
+  }
+
+  async function selectRepo(repo) {
+    setSelectedRepo(repo);
+    setStep("issue");
+    setListError("");
+    setLoadingIssues(true);
+    try {
+      setIssues(await api.listGithubIssues(selectedAccount.login, repo.name));
+    } catch (err) {
+      setListError(err.message);
+    } finally {
+      setLoadingIssues(false);
+    }
+  }
+
+  function selectIssue(issue) {
+    setSelectedIssue(issue);
+    setStep("action");
+  }
+
+  function goBackTo(target) {
+    setStep(target);
+    if (target === "account") {
+      setSelectedAccount(null);
+      setRepos([]);
+      setSelectedRepo(null);
+      setIssues([]);
+      setSelectedIssue(null);
+    } else if (target === "repo") {
+      setSelectedRepo(null);
+      setIssues([]);
+      setSelectedIssue(null);
+    } else if (target === "issue") {
+      setSelectedIssue(null);
+    }
+  }
+
+  function runAction(kind) {
+    const owner = selectedAccount.login;
+    const repo = selectedRepo.name;
+    const text =
+      kind === "fix"
+        ? `Fix the bug in issue #${selectedIssue.number} in ${owner}/${repo}`
+        : `Investigate issue #${selectedIssue.number} in ${owner}/${repo}`;
+    action.run(text);
+  }
+
   return (
     <div className="card">
-      <h2>New Request</h2>
-      <p className="muted">
-        "Investigate ..." routes to the Knowledge Agent. "Fix / implement / resolve ..." routes
-        to the Engineering Agent, which produces a proposal — nothing is written to GitHub from
-        this screen.
-      </p>
-      <form onSubmit={handleSubmit}>
-        <textarea
-          rows={3}
-          placeholder="Fix the bug in issue #14 in owner/repo"
-          value={requestText}
-          onChange={(e) => setRequestText(e.target.value)}
-        />
-        <button type="submit" disabled={loading || !requestText.trim()}>
-          {loading ? "Working..." : "Send"}
-        </button>
-      </form>
-      {error && <div className="error">{error}</div>}
-      {events.length > 0 && (
-        <div className="activity-feed">
-          {events.map((text, i) => (
-            <div key={i} className="activity-line">
-              <span className="activity-dot" />
-              {text}
-            </div>
-          ))}
-        </div>
+      <div className="breadcrumb">
+        <span className={`crumb ${step === "account" ? "active" : ""}`} onClick={() => goBackTo("account")}>
+          Account
+        </span>
+        {selectedAccount && (
+          <>
+            <span className="crumb-sep">/</span>
+            <span className={`crumb ${step === "repo" ? "active" : ""}`} onClick={() => goBackTo("repo")}>
+              {selectedAccount.login}
+            </span>
+          </>
+        )}
+        {selectedRepo && (
+          <>
+            <span className="crumb-sep">/</span>
+            <span className={`crumb ${step === "issue" ? "active" : ""}`} onClick={() => goBackTo("issue")}>
+              {selectedRepo.name}
+            </span>
+          </>
+        )}
+        {selectedIssue && (
+          <>
+            <span className="crumb-sep">/</span>
+            <span className="crumb active">#{selectedIssue.number}</span>
+          </>
+        )}
+      </div>
+
+      {listError && <div className="error">{listError}</div>}
+
+      {step === "account" && (
+        <>
+          <h2>Find a GitHub account</h2>
+          <form onSubmit={handleSearchAccounts}>
+            <input
+              placeholder="Username or org"
+              value={accountQuery}
+              onChange={(e) => setAccountQuery(e.target.value)}
+            />
+            <button type="submit" disabled={searching || !accountQuery.trim()}>
+              {searching ? "Searching..." : "Search"}
+            </button>
+          </form>
+          <div className="picker-list">
+            {accounts.map((a) => (
+              <div key={a.login} className="picker-item" onClick={() => selectAccount(a)}>
+                {a.avatar_url && <img src={a.avatar_url} alt="" className="picker-avatar" />}
+                <span>{a.login}</span>
+              </div>
+            ))}
+          </div>
+        </>
       )}
-      {finalReport && (
-        <div className="result-block">
-          <div className="badge">Completed</div>
-          <pre>{finalReport}</pre>
-        </div>
+
+      {step === "repo" && (
+        <>
+          <h2>Select a repository</h2>
+          {loadingRepos ? (
+            <p className="muted">Loading repos...</p>
+          ) : (
+            <div className="picker-list">
+              {repos.map((r) => (
+                <div key={r.full_name || r.name} className="picker-item" onClick={() => selectRepo(r)}>
+                  <strong>{r.name}</strong>
+                  {r.description && <p className="muted">{r.description}</p>}
+                </div>
+              ))}
+              {repos.length === 0 && <p className="muted">No repositories found.</p>}
+            </div>
+          )}
+        </>
+      )}
+
+      {step === "issue" && (
+        <>
+          <h2>Select an issue</h2>
+          {loadingIssues ? (
+            <p className="muted">Loading issues...</p>
+          ) : (
+            <div className="picker-list">
+              {issues.map((iss) => (
+                <div key={iss.number} className="picker-item" onClick={() => selectIssue(iss)}>
+                  <span className="badge">#{iss.number}</span> {iss.title}
+                </div>
+              ))}
+              {issues.length === 0 && <p className="muted">No open issues found.</p>}
+            </div>
+          )}
+        </>
+      )}
+
+      {step === "action" && selectedIssue && (
+        <>
+          <h2>
+            #{selectedIssue.number} — {selectedIssue.title}
+          </h2>
+          <p className="muted">
+            {selectedAccount.login}/{selectedRepo.name}
+          </p>
+          <div className="actions">
+            <button onClick={() => runAction("investigate")} disabled={action.loading}>
+              {action.loading ? "Working..." : "Investigate"}
+            </button>
+            <button className="approve" onClick={() => runAction("fix")} disabled={action.loading}>
+              {action.loading ? "Working..." : "Fix"}
+            </button>
+          </div>
+          {action.error && <div className="error">{action.error}</div>}
+          {action.events.length > 0 && (
+            <div className="activity-feed">
+              {action.events.map((text, i) => (
+                <div key={i} className="activity-line">
+                  <span className="activity-dot" />
+                  {text}
+                </div>
+              ))}
+            </div>
+          )}
+          {action.finalReport && (
+            <div className="result-block">
+              <div className="badge">Completed</div>
+              <pre>{action.finalReport}</pre>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
@@ -262,7 +449,7 @@ function ProposalsPanel({ active }) {
   }
 
   // Panels now stay mounted permanently (see App's <main> below) so
-  // switching tabs doesn't wipe RequestPanel's state. Refetch every
+  // switching tabs doesn't wipe the picker's state. Refetch every
   // time this tab becomes the active one, not just on first mount —
   // otherwise proposals created after the initial load would never
   // show up without a full page refresh.
@@ -363,7 +550,7 @@ export default function App() {
 
       <nav>
         <button className={tab === "request" ? "active" : ""} onClick={() => setTab("request")}>
-          New Request
+          Find & Fix
         </button>
         <button
           className={tab === "proposals" ? "active" : ""}
@@ -376,9 +563,9 @@ export default function App() {
       <main>
         {/* Both panels stay mounted (hidden via CSS instead of
             conditionally rendered) so switching tabs doesn't wipe
-            RequestPanel's in-progress streaming state or result. */}
+            the picker's in-progress streaming state or result. */}
         <div style={{ display: tab === "request" ? "block" : "none" }}>
-          <RequestPanel />
+          <IssuePickerPanel />
         </div>
         <div style={{ display: tab === "proposals" ? "block" : "none" }}>
           <ProposalsPanel active={tab === "proposals"} />
