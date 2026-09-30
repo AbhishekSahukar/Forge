@@ -1,4 +1,4 @@
-const API_BASE = "http://localhost:8000";
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
 function getToken() {
   return localStorage.getItem("forge_token");
@@ -143,6 +143,18 @@ export async function streamTriage(userRequest, onEvent) {
 
 export function investigate(task) {
   return request("/agent/investigate", { method: "POST", body: { task } });
+}
+
+export function searchGithubAccounts(query) {
+  return request(`/github/search-accounts?q=${encodeURIComponent(query)}`);
+}
+
+export function listGithubRepos(owner) {
+  return request(`/github/${encodeURIComponent(owner)}/repos`);
+}
+
+export function listGithubIssues(owner, repo) {
+  return request(`/github/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/issues`);
 }
 
 export function listProposals() {

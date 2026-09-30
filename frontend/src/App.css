@@ -328,3 +328,62 @@ td {
   border-radius: 50%;
   background: #3b6df0;
 }
+
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 18px;
+  font-size: 13px;
+}
+
+.crumb {
+  color: #6b7385;
+  cursor: pointer;
+}
+
+.crumb.active {
+  color: #e6e6e6;
+  font-weight: 600;
+  cursor: default;
+}
+
+.crumb-sep {
+  color: #3a3f4d;
+}
+
+.picker-list {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.picker-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid #262b36;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.picker-item:hover {
+  background: #1e222c;
+  border-color: #3b6df0;
+}
+
+.picker-item p {
+  margin: 2px 0 0;
+  font-size: 12px;
+}
+
+.picker-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+}
